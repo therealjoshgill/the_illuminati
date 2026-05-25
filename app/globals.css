@@ -1,26 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0f;
+  --foreground: #ffffff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-tomorrow);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-tomorrow), 'Tomorrow', sans-serif;
+  font-weight: 500;
+}
+
+/* ── Cosmic chat background ──────────────────────────────────────────────── */
+/* Three large nebula clouds layered over a tiled 700×500 starfield SVG.     */
+.cosmic-bg {
+  background-color: #0a0a0f;
+  background-image:
+    radial-gradient(ellipse at 15% 40%, rgba(80, 40, 140, 0.14) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 25%, rgba(20, 40, 120, 0.16) 0%, transparent 50%),
+    radial-gradient(ellipse at 55% 85%, rgba(60, 15, 90, 0.11) 0%, transparent 45%),
+    url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='700' height='500'><circle cx='23' cy='45' r='1' fill='white' opacity='0.7'/><circle cx='78' cy='12' r='0.6' fill='white' opacity='0.5'/><circle cx='145' cy='67' r='0.9' fill='white' opacity='0.6'/><circle cx='200' cy='23' r='0.7' fill='white' opacity='0.8'/><circle cx='267' cy='89' r='0.5' fill='white' opacity='0.4'/><circle cx='312' cy='34' r='0.8' fill='white' opacity='0.6'/><circle cx='389' cy='67' r='0.6' fill='white' opacity='0.7'/><circle cx='456' cy='23' r='0.7' fill='white' opacity='0.5'/><circle cx='523' cy='89' r='0.5' fill='white' opacity='0.6'/><circle cx='600' cy='34' r='0.9' fill='white' opacity='0.4'/><circle cx='667' cy='78' r='0.6' fill='white' opacity='0.7'/><circle cx='34' cy='145' r='0.5' fill='white' opacity='0.5'/><circle cx='101' cy='123' r='0.7' fill='white' opacity='0.6'/><circle cx='178' cy='156' r='0.8' fill='white' opacity='0.4'/><circle cx='245' cy='134' r='0.6' fill='white' opacity='0.7'/><circle cx='350' cy='167' r='0.7' fill='white' opacity='0.5'/><circle cx='423' cy='145' r='0.5' fill='white' opacity='0.6'/><circle cx='489' cy='178' r='0.8' fill='white' opacity='0.4'/><circle cx='556' cy='156' r='0.6' fill='white' opacity='0.7'/><circle cx='634' cy='134' r='0.7' fill='white' opacity='0.5'/><circle cx='15' cy='234' r='0.5' fill='white' opacity='0.4'/><circle cx='85' cy='256' r='0.8' fill='white' opacity='0.6'/><circle cx='155' cy='278' r='0.6' fill='white' opacity='0.7'/><circle cx='234' cy='245' r='0.7' fill='white' opacity='0.5'/><circle cx='312' cy='289' r='0.5' fill='white' opacity='0.4'/><circle cx='389' cy='256' r='0.8' fill='white' opacity='0.6'/><circle cx='467' cy='278' r='0.6' fill='white' opacity='0.5'/><circle cx='545' cy='256' r='0.7' fill='white' opacity='0.7'/><circle cx='612' cy='289' r='0.5' fill='white' opacity='0.4'/><circle cx='45' cy='356' r='0.7' fill='white' opacity='0.5'/><circle cx='123' cy='378' r='0.6' fill='white' opacity='0.6'/><circle cx='200' cy='345' r='0.8' fill='white' opacity='0.4'/><circle cx='278' cy='389' r='0.5' fill='white' opacity='0.7'/><circle cx='356' cy='412' r='0.7' fill='white' opacity='0.5'/><circle cx='434' cy='378' r='0.6' fill='white' opacity='0.6'/><circle cx='512' cy='345' r='0.8' fill='white' opacity='0.4'/><circle cx='589' cy='412' r='0.5' fill='white' opacity='0.7'/><circle cx='656' cy='378' r='0.7' fill='white' opacity='0.5'/><circle cx='90' cy='445' r='0.6' fill='white' opacity='0.4'/><circle cx='234' cy='467' r='0.8' fill='white' opacity='0.6'/><circle cx='378' cy='445' r='0.5' fill='white' opacity='0.5'/><circle cx='512' cy='467' r='0.7' fill='white' opacity='0.4'/><circle cx='634' cy='456' r='0.6' fill='white' opacity='0.6'/></svg>");
+  background-size: 100% 100%, 100% 100%, 100% 100%, 700px 500px;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat;
 }
