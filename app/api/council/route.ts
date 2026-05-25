@@ -1,18 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createClient } from "@supabase/supabase-js";
+import type { CouncilTurn } from "@/lib/supabase";
 
 const MEMBER_SYSTEM =
   "You are a council member in The Illuminati — a council of AI minds convened to deliberate on questions with wisdom and depth. Respond thoughtfully and concisely.";
 
-interface CouncilHistory {
-  userMessage: string;
-  claude: string;
-  gpt4: string;
-  gemini: string;
-  grokResponse: string;
-  chairman: string;
-}
+// CouncilHistory is the same shape as CouncilTurn — aliased for route clarity.
+type CouncilHistory = CouncilTurn;
 
 async function callClaude(message: string, history: CouncilHistory[], anthropic: Anthropic): Promise<string> {
   const messages: Anthropic.MessageParam[] = [];
@@ -126,10 +122,14 @@ export async function POST(request: Request) {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const grok = new OpenAI({ apiKey: process.env.GROK_API_KEY, baseURL: "https://api.x.ai/v1" });
   const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   try {
-    const body = await request.json() as { message: string; history: CouncilHistory[] };
-    const { message, history = [] } = body;
+    const body = await request.json() as { message: string; history: CouncilHistory[]; conversationId?: string };
+    const { message, history = [], conversationId } = body;
 
     if (!message?.trim()) {
       return Response.json({ error: "Message is required" }, { status: 400 });
@@ -152,12 +152,40 @@ export async function POST(request: Request) {
       anthropic
     );
 
+    // Persist to Supabase ------------------------------------------------
+    const newTurn: CouncilTurn = {
+      userMessage: message,
+      claude: claudeResponse,
+      gpt4: gpt4Response,
+      gemini: geminiResponse,
+      grokResponse,
+      chairman: chairmanResponse,
+    };
+
+    let savedConversationId = conversationId ?? null;
+
+    if (!conversationId) {
+      const { data } = await supabase
+        .from("conversations")
+        .insert({ title: message, turns: [newTurn] })
+        .select("id")
+        .single();
+      savedConversationId = data?.id ?? null;
+    } else {
+      await supabase
+        .from("conversations")
+        .update({ turns: [...history, newTurn] })
+        .eq("id", conversationId);
+    }
+    // --------------------------------------------------------------------
+
     return Response.json({
       claude: claudeResponse,
       gpt4: gpt4Response,
       gemini: geminiResponse,
       grokResponse,
       chairman: chairmanResponse,
+      conversationId: savedConversationId,
     });
   } catch (err) {
     console.error("Council API error:", err);
