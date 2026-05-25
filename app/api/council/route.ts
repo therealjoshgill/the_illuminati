@@ -122,9 +122,14 @@ export async function POST(request: Request) {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const grok = new OpenAI({ apiKey: process.env.GROK_API_KEY, baseURL: "https://api.x.ai/v1" });
   const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  console.log("[Supabase] NEXT_PUBLIC_SUPABASE_URL (first 10):", supabaseUrl?.slice(0, 10) ?? "MISSING");
+  console.log("[Supabase] NEXT_PUBLIC_SUPABASE_ANON_KEY (first 10):", supabaseKey?.slice(0, 10) ?? "MISSING");
+
   const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    supabaseUrl ?? "",
+    supabaseKey ?? ""
   );
 
   try {
