@@ -165,17 +165,40 @@ export async function POST(request: Request) {
     let savedConversationId = conversationId ?? null;
 
     if (!conversationId) {
-      const { data } = await supabase
+      console.log("[Supabase] Inserting new conversation, title:", message.slice(0, 60));
+      const { data, error } = await supabase
         .from("conversations")
         .insert({ title: message, turns: [newTurn] })
         .select("id")
         .single();
-      savedConversationId = data?.id ?? null;
+      if (error) {
+        console.error("[Supabase] INSERT failed:", {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+      } else {
+        console.log("[Supabase] INSERT succeeded, conversationId:", data.id);
+        savedConversationId = data.id;
+      }
     } else {
-      await supabase
+      console.log("[Supabase] Updating conversation:", conversationId, "— appending turn", history.length + 1);
+      const { error } = await supabase
         .from("conversations")
         .update({ turns: [...history, newTurn] })
         .eq("id", conversationId);
+      if (error) {
+        console.error("[Supabase] UPDATE failed:", {
+          conversationId,
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+      } else {
+        console.log("[Supabase] UPDATE succeeded, conversationId:", conversationId);
+      }
     }
     // --------------------------------------------------------------------
 
