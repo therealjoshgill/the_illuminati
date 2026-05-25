@@ -23,7 +23,7 @@ async function callClaude(message: string, history: CouncilHistory[], anthropic:
   messages.push({ role: "user", content: message });
 
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     max_tokens: 1024,
     system: MEMBER_SYSTEM,
     messages,
@@ -43,7 +43,7 @@ async function callGPT4(message: string, history: CouncilHistory[], openai: Open
   messages.push({ role: "user", content: message });
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-4.1",
     max_tokens: 1024,
     messages,
   });
@@ -79,7 +79,7 @@ async function callGrok(message: string, history: CouncilHistory[], grok: OpenAI
   messages.push({ role: "user", content: message });
 
   const response = await grok.chat.completions.create({
-    model: "grok-3",
+    model: "grok-4.3",
     max_tokens: 1024,
     messages,
   });
@@ -112,7 +112,7 @@ async function callChairman(
   });
 
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     max_tokens: 1500,
     system: "You are the Chairman of The Illuminati — a supreme council of AI minds. You have heard from four council members and must now synthesize their perspectives into a wise, unified consensus. Be authoritative, balanced, and incisive.",
     messages,
