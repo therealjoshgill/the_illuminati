@@ -53,7 +53,7 @@ async function callGPT4(message: string, history: CouncilHistory[], openai: Open
 
 async function callGemini(message: string, history: CouncilHistory[], genai: GoogleGenerativeAI): Promise<string> {
   const model = genai.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: MEMBER_SYSTEM,
   });
 
