@@ -164,6 +164,7 @@ export async function POST(request: Request) {
 
     let savedConversationId = conversationId ?? null;
 
+    console.log("=== SUPABASE SAVE ATTEMPT ===");
     if (!conversationId) {
       console.log("[Supabase] Inserting new conversation, title:", message.slice(0, 60));
       const { data, error } = await supabase
@@ -178,6 +179,7 @@ export async function POST(request: Request) {
           details: error.details,
           hint: error.hint,
         });
+        console.error("[Supabase] INSERT full error:", JSON.stringify(error));
       } else {
         console.log("[Supabase] INSERT succeeded, conversationId:", data.id);
         savedConversationId = data.id;
