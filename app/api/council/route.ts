@@ -2,11 +2,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const grok = new OpenAI({ apiKey: process.env.GROK_API_KEY, baseURL: "https://api.x.ai/v1" });
-const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
-
 const MEMBER_SYSTEM =
   "You are a council member in The Illuminati — a council of AI minds convened to deliberate on questions with wisdom and depth. Respond thoughtfully and concisely.";
 
@@ -19,7 +14,7 @@ interface CouncilHistory {
   chairman: string;
 }
 
-async function callClaude(message: string, history: CouncilHistory[]): Promise<string> {
+async function callClaude(message: string, history: CouncilHistory[], anthropic: Anthropic): Promise<string> {
   const messages: Anthropic.MessageParam[] = [];
   for (const turn of history) {
     messages.push({ role: "user", content: turn.userMessage });
@@ -37,7 +32,7 @@ async function callClaude(message: string, history: CouncilHistory[]): Promise<s
   return response.content[0].type === "text" ? response.content[0].text : "";
 }
 
-async function callGPT4(message: string, history: CouncilHistory[]): Promise<string> {
+async function callGPT4(message: string, history: CouncilHistory[], openai: OpenAI): Promise<string> {
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: MEMBER_SYSTEM },
   ];
@@ -56,7 +51,7 @@ async function callGPT4(message: string, history: CouncilHistory[]): Promise<str
   return response.choices[0]?.message?.content ?? "";
 }
 
-async function callGemini(message: string, history: CouncilHistory[]): Promise<string> {
+async function callGemini(message: string, history: CouncilHistory[], genai: GoogleGenerativeAI): Promise<string> {
   const model = genai.getGenerativeModel({
     model: "gemini-1.5-pro",
     systemInstruction: MEMBER_SYSTEM,
@@ -73,7 +68,7 @@ async function callGemini(message: string, history: CouncilHistory[]): Promise<s
   return result.response.text();
 }
 
-async function callGrok(message: string, history: CouncilHistory[]): Promise<string> {
+async function callGrok(message: string, history: CouncilHistory[], grok: OpenAI): Promise<string> {
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: MEMBER_SYSTEM },
   ];
@@ -98,7 +93,8 @@ async function callChairman(
   gpt4Response: string,
   geminiResponse: string,
   grokResponse: string,
-  history: CouncilHistory[]
+  history: CouncilHistory[],
+  anthropic: Anthropic
 ): Promise<string> {
   const messages: Anthropic.MessageParam[] = [];
 
@@ -126,6 +122,11 @@ async function callChairman(
 }
 
 export async function POST(request: Request) {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const grok = new OpenAI({ apiKey: process.env.GROK_API_KEY, baseURL: "https://api.x.ai/v1" });
+  const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
+
   try {
     const body = await request.json() as { message: string; history: CouncilHistory[] };
     const { message, history = [] } = body;
@@ -135,10 +136,10 @@ export async function POST(request: Request) {
     }
 
     const [claudeResponse, gpt4Response, geminiResponse, grokResponse] = await Promise.all([
-      callClaude(message, history),
-      callGPT4(message, history),
-      callGemini(message, history),
-      callGrok(message, history),
+      callClaude(message, history, anthropic),
+      callGPT4(message, history, openai),
+      callGemini(message, history, genai),
+      callGrok(message, history, grok),
     ]);
 
     const chairmanResponse = await callChairman(
@@ -147,7 +148,8 @@ export async function POST(request: Request) {
       gpt4Response,
       geminiResponse,
       grokResponse,
-      history
+      history,
+      anthropic
     );
 
     return Response.json({
