@@ -6,22 +6,28 @@ import type { CouncilTurn, Conversation } from "@/lib/supabase";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
+type MemberKey = "claude" | "gpt4" | "gemini" | "grokResponse";
+
+type PartialTurn = {
+  userMessage: string;
+  claude?: string; gpt4?: string; gemini?: string;
+  grokResponse?: string; chairman?: string;
+  partial: true;
+};
+
 interface LoadingState {
-  claude: boolean;
-  gpt4: boolean;
-  gemini: boolean;
-  grokResponse: boolean;
-  chairman: boolean;
+  claude: boolean; gpt4: boolean; gemini: boolean;
+  grokResponse: boolean; chairman: boolean;
 }
 
 const LOADING_OFF: LoadingState = { claude: false, gpt4: false, gemini: false, grokResponse: false, chairman: false };
 const LOADING_ON:  LoadingState = { claude: true,  gpt4: true,  gemini: true,  grokResponse: true,  chairman: true  };
 
 const MEMBERS = [
-  { key: "claude"       as const, name: "Claude", subtitle: "Sonnet 4" },
-  { key: "gpt4"         as const, name: "GPT-4",  subtitle: "OpenAI"   },
-  { key: "gemini"       as const, name: "Gemini", subtitle: "Google"   },
-  { key: "grokResponse" as const, name: "Grok",   subtitle: "xAI"      },
+  { key: "claude"       as MemberKey, name: "Claude", subtitle: "Sonnet 4" },
+  { key: "gpt4"         as MemberKey, name: "GPT-4",  subtitle: "OpenAI"   },
+  { key: "gemini"       as MemberKey, name: "Gemini", subtitle: "Google"   },
+  { key: "grokResponse" as MemberKey, name: "Grok",   subtitle: "xAI"      },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -35,29 +41,38 @@ function formatDate(iso: string) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────
+/** Safely read a field from either a full or partial turn. */
+function getTurnValue(turn: CouncilTurn | PartialTurn, key: string): string {
+  return ((turn as Record<string, unknown>)[key] as string) ?? "";
+}
+
+/** First ~110 chars, trimmed to a word boundary, + ellipsis. */
+function getPreview(text: string, max = 110): string {
+  if (!text) return "";
+  const t = text.trim();
+  if (t.length <= max) return t;
+  return t.slice(0, max).trimEnd() + "…";
+}
+
+// ── Shared presentational primitives ─────────────────────────────────────
 
 function CosmicEyeLogo() {
   return (
     <svg width="26" height="30" viewBox="0 0 28 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Triangle */}
       <polygon points="14,8 26,28 2,28" stroke="#F8ADE6" strokeWidth="1.2" strokeLinejoin="round" />
-      {/* Eye — lens / vesica shape */}
       <path d="M8,20 Q14,14 20,20 Q14,26 8,20 Z" stroke="#F8ADE6" strokeWidth="0.9" />
-      {/* Pupil */}
       <circle cx="14" cy="20" r="2" fill="#F8ADE6" />
-      {/* Starburst rays from apex */}
-      <line x1="14" y1="8" x2="14"   y2="2"   stroke="#F8ADE6" strokeWidth="0.9" strokeLinecap="round" />
-      <line x1="14" y1="8" x2="17.5" y2="4"   stroke="#F8ADE6" strokeWidth="0.7" strokeLinecap="round" />
-      <line x1="14" y1="8" x2="10.5" y2="4"   stroke="#F8ADE6" strokeWidth="0.7" strokeLinecap="round" />
-      <line x1="14" y1="8" x2="20"   y2="6"   stroke="#F8ADE6" strokeWidth="0.5" strokeLinecap="round" opacity="0.5" />
-      <line x1="14" y1="8" x2="8"    y2="6"   stroke="#F8ADE6" strokeWidth="0.5" strokeLinecap="round" opacity="0.5" />
+      <line x1="14" y1="8" x2="14"   y2="2" stroke="#F8ADE6" strokeWidth="0.9" strokeLinecap="round" />
+      <line x1="14" y1="8" x2="17.5" y2="4" stroke="#F8ADE6" strokeWidth="0.7" strokeLinecap="round" />
+      <line x1="14" y1="8" x2="10.5" y2="4" stroke="#F8ADE6" strokeWidth="0.7" strokeLinecap="round" />
+      <line x1="14" y1="8" x2="20"   y2="6" stroke="#F8ADE6" strokeWidth="0.5" strokeLinecap="round" opacity="0.5" />
+      <line x1="14" y1="8" x2="8"    y2="6" stroke="#F8ADE6" strokeWidth="0.5" strokeLinecap="round" opacity="0.5" />
     </svg>
   );
 }
 
 function PulsingDots({ dark = false }: { dark?: boolean }) {
-  const cls = dark ? "bg-[#0a0a0f]/40" : "bg-zinc-500";
+  const cls = dark ? "bg-[#0a0a0f]/35" : "bg-zinc-600";
   return (
     <div className="flex items-center gap-1 py-1">
       <div className={`w-1.5 h-1.5 rounded-full ${cls} animate-bounce`} style={{ animationDelay: "0ms"   }} />
@@ -67,49 +82,186 @@ function PulsingDots({ dark = false }: { dark?: boolean }) {
   );
 }
 
-interface MemberPanelProps {
+// ── CollapsedCard ─────────────────────────────────────────────────────────
+
+interface CollapsedCardProps {
   name: string;
-  subtitle: string;
-  response: string;
-  loading: boolean;
+  preview: string;
+  isLoading: boolean;
+  disabled: boolean;
+  onClick: () => void;
 }
 
-function MemberPanel({ name, subtitle, response, loading }: MemberPanelProps) {
+function CollapsedCard({ name, preview, isLoading, disabled, onClick }: CollapsedCardProps) {
   return (
-    <div className="flex flex-col rounded-xl border border-white/[0.06] bg-[#1e1e2a] overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.06]">
-        <span className="text-sm text-white font-semibold tracking-wide">{name}</span>
-        <span className="ml-auto text-[11px] text-zinc-600 tracking-wider uppercase">{subtitle}</span>
+    <div
+      onClick={disabled ? undefined : onClick}
+      style={{ transition: "opacity 300ms ease" }}
+      className={[
+        "rounded-xl border border-white/[0.06] bg-[#1e1e2a] p-3",
+        "flex flex-col gap-1.5 min-h-[84px] overflow-hidden",
+        "opacity-25",
+        disabled ? "cursor-default" : "cursor-pointer hover:opacity-40",
+      ].join(" ")}
+    >
+      <div className="text-[10px] font-semibold text-white tracking-[0.12em] uppercase">
+        {name}
       </div>
-      <div className="flex-1 p-4 text-sm text-zinc-300 leading-relaxed min-h-[120px]">
-        {loading ? (
-          <PulsingDots />
+      <div className="text-[11px] text-zinc-500 leading-relaxed line-clamp-3">
+        {isLoading ? <PulsingDots /> : preview || <span className="italic text-zinc-700">—</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── ExpandedCard ──────────────────────────────────────────────────────────
+
+interface ExpandedCardProps {
+  name: string;
+  label: string;
+  response: string;
+  isLoading: boolean;
+  onBack?: () => void;  // present only when a member (not chairman) is expanded
+}
+
+function ExpandedCard({ name, label, response, isLoading, onBack }: ExpandedCardProps) {
+  return (
+    <div
+      className="rounded-xl overflow-hidden"
+      style={{
+        background: "rgba(248, 173, 230, 0.75)",
+        boxShadow: "0 0 56px rgba(248,173,230,0.16), 0 0 16px rgba(248,173,230,0.07)",
+        animation: "fadeInUp 280ms ease forwards",
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-black/[0.08]">
+        <span className="text-sm font-semibold" style={{ color: "#0a0a0f" }}>{name}</span>
+        <span className="text-xs" style={{ color: "#0a0a0f", opacity: 0.45 }}>{label}</span>
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="ml-auto flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-md"
+            style={{
+              background: "rgba(10,10,15,0.10)",
+              color: "#0a0a0f",
+              transition: "opacity 200ms ease",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = "0.7")}
+            onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+          >
+            {/* chevron-left */}
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6.5 2 L3.5 5 L6.5 8" />
+            </svg>
+            Chairman
+          </button>
+        )}
+      </div>
+      {/* Body */}
+      <div className="p-5 text-sm leading-relaxed min-h-[96px]" style={{ color: "#0a0a0f" }}>
+        {isLoading ? (
+          <PulsingDots dark />
         ) : response ? (
           <p className="whitespace-pre-wrap">{response}</p>
         ) : (
-          <p className="text-zinc-700 italic">Awaiting query…</p>
+          <p className="italic" style={{ opacity: 0.4 }}>Awaiting…</p>
         )}
       </div>
     </div>
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────
+// ── TurnCard ──────────────────────────────────────────────────────────────
+// Manages its own expand/collapse state independently per turn.
+
+interface TurnCardProps {
+  turn: CouncilTurn | PartialTurn;
+  isPartial: boolean;
+  loading: LoadingState;
+}
+
+function TurnCard({ turn, isPartial, loading }: TurnCardProps) {
+  // null  → default state: chairman expanded below, all 4 members collapsed above
+  // key   → that member expanded below, 3 members + chairman collapsed above
+  const [expanded, setExpanded] = useState<MemberKey | null>(null);
+
+  // Build the top row: 4 cards, with expanded member swapped for chairman
+  const topRow = MEMBERS.map(m =>
+    expanded === m.key
+      ? { key: "chairman" as const, name: "Chairman", subtitle: "Synthesis", isMember: false }
+      : { key: m.key,               name: m.name,      subtitle: m.subtitle,  isMember: true  }
+  );
+
+  // What goes in the expanded panel
+  const expandedIsChairman = expanded === null;
+  const expandedMeta = expanded ? MEMBERS.find(m => m.key === expanded) : null;
+  const expandedName    = expandedIsChairman ? "Chairman" : (expandedMeta?.name ?? "");
+  const expandedLabel   = expandedIsChairman ? "— Consensus Synthesis" : (expandedMeta?.subtitle ?? "");
+  const expandedContent = expanded ? getTurnValue(turn, expanded) : (turn.chairman ?? "");
+  const expandedLoading = isPartial && (expanded ? loading[expanded] : loading.chairman);
+
+  function handleTopRowClick(key: string) {
+    if (isPartial) return;
+    setExpanded(key === "chairman" ? null : (key as MemberKey));
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* User message */}
+      <div className="flex justify-end">
+        <div
+          className="max-w-2xl rounded-2xl px-4 py-3 text-sm border border-white/[0.08]"
+          style={{ background: "#1e1e2a", color: "#e4e4f0" }}
+        >
+          {turn.userMessage}
+        </div>
+      </div>
+
+      {/* Top row — 4 collapsed cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {topRow.map(item => {
+          const preview  = isPartial ? "" : getPreview(getTurnValue(turn, item.key));
+          const loading_ = isPartial && loading[(item.key === "chairman" ? "chairman" : item.key) as keyof LoadingState];
+          return (
+            <CollapsedCard
+              key={item.key}
+              name={item.name}
+              preview={preview}
+              isLoading={!!loading_}
+              disabled={isPartial}
+              onClick={() => handleTopRowClick(item.key)}
+            />
+          );
+        })}
+      </div>
+
+      {/* Expanded panel — keyed so React remounts on change, triggering CSS animation */}
+      <ExpandedCard
+        key={expanded ?? "chairman"}
+        name={expandedName}
+        label={expandedLabel}
+        response={expandedContent}
+        isLoading={expandedLoading}
+        onBack={expanded ? () => setExpanded(null) : undefined}
+      />
+    </div>
+  );
+}
+
+// ── Home ──────────────────────────────────────────────────────────────────
 
 export default function Home() {
-  // Chat state
-  const [history,             setHistory]             = useState<CouncilTurn[]>([]);
-  const [input,               setInput]               = useState("");
-  const [loading,             setLoading]             = useState<LoadingState>(LOADING_OFF);
-  const [current,             setCurrent]             = useState<Partial<CouncilTurn> & { userMessage?: string }>({});
-  const [error,               setError]               = useState<string | null>(null);
+  const [history,              setHistory]              = useState<CouncilTurn[]>([]);
+  const [input,                setInput]                = useState("");
+  const [loading,              setLoading]              = useState<LoadingState>(LOADING_OFF);
+  const [current,              setCurrent]              = useState<Partial<CouncilTurn> & { userMessage?: string }>({});
+  const [error,                setError]                = useState<string | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [conversations,        setConversations]        = useState<Conversation[]>([]);
+  const [sidebarLoading,       setSidebarLoading]       = useState(true);
 
-  // Sidebar state
-  const [conversations,  setConversations]  = useState<Conversation[]>([]);
-  const [sidebarLoading, setSidebarLoading] = useState(true);
-
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef  = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const isAnyLoading = Object.values(loading).some(Boolean);
@@ -118,7 +270,6 @@ export default function Home() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [history, current]);
 
-  // Load conversations + real-time subscription
   useEffect(() => {
     async function fetchConversations() {
       setSidebarLoading(true);
@@ -135,11 +286,11 @@ export default function Home() {
       .channel("conversations-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "conversations" }, (payload) => {
         const incoming = payload.new as Conversation;
-        setConversations((prev) => prev.some((c) => c.id === incoming.id) ? prev : [incoming, ...prev]);
+        setConversations(prev => prev.some(c => c.id === incoming.id) ? prev : [incoming, ...prev]);
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations" }, (payload) => {
         const updated = payload.new as Conversation;
-        setConversations((prev) => prev.map((c) => c.id === updated.id ? updated : c));
+        setConversations(prev => prev.map(c => c.id === updated.id ? updated : c));
       })
       .subscribe();
 
@@ -147,20 +298,14 @@ export default function Home() {
   }, []);
 
   const handleNewChat = useCallback(() => {
-    setHistory([]);
-    setCurrent({});
-    setError(null);
-    setActiveConversationId(null);
-    setInput("");
+    setHistory([]); setCurrent({}); setError(null);
+    setActiveConversationId(null); setInput("");
     inputRef.current?.focus();
   }, []);
 
   const loadConversation = useCallback((conv: Conversation) => {
-    setHistory(conv.turns);
-    setActiveConversationId(conv.id);
-    setCurrent({});
-    setError(null);
-    setInput("");
+    setHistory(conv.turns); setActiveConversationId(conv.id);
+    setCurrent({}); setError(null); setInput("");
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -168,8 +313,7 @@ export default function Home() {
     const message = input.trim();
     if (!message || isAnyLoading) return;
 
-    setInput("");
-    setError(null);
+    setInput(""); setError(null);
     setCurrent({ userMessage: message });
     setLoading(LOADING_ON);
 
@@ -190,16 +334,11 @@ export default function Home() {
         grokResponse: string; chairman: string; conversationId: string;
       };
 
-      const turn: CouncilTurn = {
+      setHistory(prev => [...prev, {
         userMessage: message,
-        claude:      data.claude,
-        gpt4:        data.gpt4,
-        gemini:      data.gemini,
-        grokResponse: data.grokResponse,
-        chairman:    data.chairman,
-      };
-
-      setHistory((prev) => [...prev, turn]);
+        claude: data.claude, gpt4: data.gpt4, gemini: data.gemini,
+        grokResponse: data.grokResponse, chairman: data.chairman,
+      }]);
       setActiveConversationId(data.conversationId);
       setCurrent({});
     } catch (err) {
@@ -217,7 +356,6 @@ export default function Home() {
     }
   }
 
-  type PartialTurn = { userMessage: string; claude?: string; gpt4?: string; gemini?: string; grokResponse?: string; chairman?: string; partial: true };
   const allTurns: (CouncilTurn | PartialTurn)[] = current.userMessage
     ? [...history, { ...current, partial: true } as PartialTurn]
     : history;
@@ -228,15 +366,12 @@ export default function Home() {
     <div className="flex h-screen overflow-hidden" style={{ background: "#0a0a0f", color: "#fff" }}>
 
       {/* ── SIDEBAR ──────────────────────────────────────────────────────── */}
-      <aside
-        className="flex-shrink-0 w-64 flex flex-col border-r border-white/[0.06] overflow-hidden"
-        style={{ background: "#111118" }}
-      >
+      <aside className="flex-shrink-0 w-64 flex flex-col border-r border-white/[0.06] overflow-hidden" style={{ background: "#111118" }}>
         {/* Logo + wordmark */}
         <div className="flex items-center gap-3 px-4 py-4 border-b border-white/[0.06]">
           <CosmicEyeLogo />
           <div className="leading-none">
-            <span className="text-[11px] text-white font-medium tracking-wider lowercase">the</span>
+            <span className="text-[11px] text-white font-medium tracking-wider">the</span>
             <span className="text-[13px] font-bold tracking-widest" style={{ color: "#F8ADE6" }}>ILLUMINATI</span>
           </div>
         </div>
@@ -265,7 +400,7 @@ export default function Home() {
           ) : conversations.length === 0 ? (
             <p className="px-3 pt-5 text-xs text-zinc-700 italic">No conversations yet</p>
           ) : (
-            conversations.map((conv) => (
+            conversations.map(conv => (
               <button
                 key={conv.id}
                 onClick={() => loadConversation(conv)}
@@ -295,76 +430,20 @@ export default function Home() {
           {allTurns.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-5 text-center px-4">
               <CosmicEyeLogo />
-              <div>
-                <p className="text-sm text-zinc-400 max-w-xs leading-relaxed">
-                  The council awaits your question. All four members will respond simultaneously, then the Chairman will synthesize a unified verdict.
-                </p>
-              </div>
+              <p className="text-sm text-zinc-500 max-w-xs leading-relaxed">
+                The council awaits your question. All four members respond simultaneously, then the Chairman synthesizes a unified verdict.
+              </p>
             </div>
           ) : (
             <div className="max-w-7xl mx-auto px-5 py-8 space-y-10">
-              {allTurns.map((turn, i) => {
-                const isPartial = "partial" in turn;
-                return (
-                  <div key={i} className="space-y-4">
-                    {/* User message */}
-                    <div className="flex justify-end">
-                      <div
-                        className="max-w-2xl rounded-2xl px-4 py-3 text-sm border border-white/[0.08]"
-                        style={{ background: "#1e1e2a", color: "#e4e4f0" }}
-                      >
-                        {turn.userMessage}
-                      </div>
-                    </div>
-
-                    {/* Council member panels */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                      {MEMBERS.map(({ key, name, subtitle }) => (
-                        <MemberPanel
-                          key={key}
-                          name={name}
-                          subtitle={subtitle}
-                          response={turn[key] ?? ""}
-                          loading={isPartial && loading[key]}
-                        />
-                      ))}
-                    </div>
-
-                    {/* Chairman consensus */}
-                    <div
-                      className="rounded-xl overflow-hidden"
-                      style={{
-                        background: "#F8ADE6",
-                        boxShadow: "0 0 48px rgba(248, 173, 230, 0.18), 0 0 12px rgba(248, 173, 230, 0.08)",
-                      }}
-                    >
-                      <div className="flex items-center gap-2 px-4 py-3 border-b border-black/10">
-                        <div
-                          className={`w-1.5 h-1.5 rounded-full bg-[#0a0a0f]/50 ${isPartial && loading.chairman ? "animate-pulse" : ""}`}
-                        />
-                        <span className="text-sm font-semibold tracking-wide" style={{ color: "#0a0a0f" }}>
-                          Chairman
-                        </span>
-                        <span className="text-xs ml-1" style={{ color: "#0a0a0f", opacity: 0.5 }}>
-                          — Consensus Synthesis
-                        </span>
-                        <span className="ml-auto text-[11px] tracking-wider uppercase" style={{ color: "#0a0a0f", opacity: 0.4 }}>
-                          Claude Sonnet 4
-                        </span>
-                      </div>
-                      <div className="p-5 text-sm leading-relaxed min-h-[80px]" style={{ color: "#0a0a0f" }}>
-                        {isPartial && loading.chairman ? (
-                          <PulsingDots dark />
-                        ) : turn.chairman ? (
-                          <p className="whitespace-pre-wrap">{turn.chairman}</p>
-                        ) : (
-                          <p style={{ opacity: 0.4 }} className="italic">Awaiting synthesis…</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {allTurns.map((turn, i) => (
+                <TurnCard
+                  key={i}
+                  turn={turn}
+                  isPartial={"partial" in turn}
+                  loading={"partial" in turn ? loading : LOADING_OFF}
+                />
+              ))}
               <div ref={bottomRef} />
             </div>
           )}
@@ -380,15 +459,12 @@ export default function Home() {
         )}
 
         {/* Input bar */}
-        <div
-          className="flex-shrink-0 border-t border-white/[0.06] px-4 py-4"
-          style={{ background: "#111118" }}
-        >
+        <div className="flex-shrink-0 border-t border-white/[0.06] px-4 py-4" style={{ background: "#111118" }}>
           <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex gap-3 items-end">
             <textarea
               ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Pose a question to the council…"
               rows={1}
@@ -410,9 +486,7 @@ export default function Home() {
                   </svg>
                   Convening
                 </span>
-              ) : (
-                "Convene"
-              )}
+              ) : "Convene"}
             </button>
           </form>
           <p className="text-center text-[11px] text-zinc-700 mt-2 tracking-wide">

@@ -18,6 +18,12 @@ body {
   font-weight: 500;
 }
 
+/* ── Expanded card animation ─────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
 /* ── Cosmic chat background ──────────────────────────────────────────────── */
 /* Three large nebula clouds layered over a tiled 700×500 starfield SVG.     */
 .cosmic-bg {
